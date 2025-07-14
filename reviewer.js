@@ -48,7 +48,7 @@ async function reviewSubmissions() {
             else if (answer.toLowerCase() === 'd') newStatus = 'rejected';
             else newStatus = 'pending';
 
-            if (newStatus !== 'pending') {
+            if (newStatus === 'approved') {
                 const { error: updateError } = await supabase
                     .from('submissions')
                     .update({ status: newStatus })
@@ -56,12 +56,36 @@ async function reviewSubmissions() {
                 if (updateError) {
                     console.error(`Failed to update status for ID ${submission.id}:`, updateError);
                 } else {
-                    console.log(`Status updated to '${newStatus}' for ID ${submission.id}`);
+                    console.log(`Status updated to 'approved' for ID ${submission.id}`);
                 }
+                askAndUpdate(index + 1);
+            } else if (newStatus === 'rejected') {
+                rl.question('Enter reason for rejection: ', async (reason) => {
+                    // Update status to rejected
+                    const { error: updateError } = await supabase
+                        .from('submissions')
+                        .update({ status: 'rejected' })
+                        .eq('id', submission.id);
+                    if (updateError) {
+                        console.error(`Failed to update status for ID ${submission.id}:`, updateError);
+                        askAndUpdate(index + 1);
+                        return;
+                    }
+                    // Insert into rejected_submissions
+                    const { error: insertError } = await supabase
+                        .from('rejected_submissions')
+                        .insert({ id: submission.id, reason });
+                    if (insertError) {
+                        console.error(`Failed to insert into rejected_submissions for ID ${submission.id}:`, insertError);
+                    } else {
+                        console.log(`Submission ${submission.id} rejected and logged with reason.`);
+                    }
+                    askAndUpdate(index + 1);
+                });
             } else {
                 console.log(`Left as pending for ID ${submission.id}`);
+                askAndUpdate(index + 1);
             }
-            askAndUpdate(index + 1);
         });
     }
 
